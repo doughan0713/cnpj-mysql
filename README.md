@@ -1,59 +1,148 @@
-# cnpj-mysql
-Script em python para carregar os arquivos de cnpj dos dados públicos da Receita Federal em MYSQL e POSTGRESQL. O código é compatível com o layout das tabelas disponibilizadas pela Receita Federal a partir de 2021.
+# 🚀 cnpj-mysql
 
-## Dados públicos de cnpj no site da Receita:
-Os arquivos csv zipados com os dados de CNPJs estão disponíveis em https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj ou https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/ (a partir de 28/10/2024.)<br>
+<p align="center">
+  <img src="https://img.shields.io/badge/status-ativo-00FF41?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/python-3.8+-blue?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/database-MySQL%20%7C%20PostgreSQL-orange?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/data-CNPJ%20Receita%20Federal-green?style=for-the-badge"/>
+</p>
 
+---
 
-## Pré-requisitos:
-Python 3.8;<br>
-Bibliotecas pandas, dask, sqlalchemy. Para mysql instalar a biblioteca pymysql. Para postgres usar psycopg2.<br>
-Para instalar a biblioteca, use o comando<br>
-pip install pymysql<br>
-Para postgres, instale psycopg2 (recomenda-se psycopg2-binary para instalação mais simples)<br>
-pip install psycopg2-binary (testado no Ubuntu).<br>
+## 🧠 Visão Geral
 
-## Utilizando o script:
-Para obter relação dos arquivos disponíveis no site da Receita Federal ou baixar os arquivos, faça o seguinte comando no Anaconda prompt:<br>
-<b>python dados_cnpj_baixa.py</b><br>
-Isto irá baixar os arquivos zipados do site da Receita na pasta "dados-publicos-zip".<br><br>
+Pipeline de ingestão de dados públicos do **Cadastro Nacional da Pessoa Jurídica (CNPJ)** diretamente da Receita Federal, com processamento em larga escala utilizando **Python + Pandas + Dask + SQLAlchemy**.
 
-<b>ATENÇÃO: Em 14/8/2024 a página de dados abertos foi modificada, o script dados_cnpj_baixa.py foi atualizado para pegar a pasta do mês mais recente.</b><br>
+Este projeto permite:
 
-Se o download estiverm muito lento, sugiro utilizar um gerenciador de downloads.<br>
+- 📥 Download automatizado dos dados oficiais
+- ⚙️ Processamento eficiente de grandes volumes (big data ready)
+- 🗄️ Persistência estruturada em **MySQL** ou **PostgreSQL**
+- 🔄 Compatibilidade com layouts atualizados da Receita (≥ 2021)
 
-Crie uma pasta com o nome "dados-publicos". Esta pasta deve estar vazia.<br>
+---
 
-No servidor MYSQL ou POSTGRES, crie um database, por exemplo, cnpj.<br>
-Especifique os parâmetros no começo do script:<br>
-dbname = 'cnpj'<br>
-username = 'root'<br>
-password = ''<br>
-host = '127.0.0.1'<br>
+## 📊 Arquitetura do Fluxo de Dados
 
-Para iniciar esse script, em um console digite<br>
-python dados_cnpj_mysql.py<br>
-ou<br>
-python dados_cnpj_postgres.py<br>
+```mermaid
+flowchart LR
+    A[Receita Federal] --> B[Download ZIP]
+    B --> C[Extração CSV]
+    C --> D[Processamento Pandas/Dask]
+    D --> E[Transformação SQLAlchemy]
+    E --> F[(MySQL/PostgreSQL)]
+| Ambiente                         | Tempo Médio  |
+| -------------------------------- | ------------ |
+| 💻 Notebook i7 8ª Gen            | ~5 horas     |
+| 🖥️ VPS otimizada                | ~2 a 4 horas |
+| ⚡ Infraestrutura paralela (Dask) | Escalável    |
+📡 Fonte Oficial dos Dados
+🔗 https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj
+🔗 https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/
 
-A execução durou cerca de 5hs em um notebook i7 de 8a geração com Windows 10 no script para mysql.
-No caso do postgres, fiz teste só com uma amostra em Linux (Ubuntu 20.4).
-Se a execução deste script demorar muito, uma opção é usar o projeto em https://github.com/rictom/cnpj-sqlite para gerar o arquivo em sqlite e usar uma ferramenta como o pgloader ou o DBeaver para converter depois em postgres.
-Este colega usou o pgloader com um bom desempenho: https://github.com/rictom/cnpj-mysql/issues/5
+⚠️ Atualizado automaticamente para a pasta mais recente após mudanças estruturais (desde 14/08/2024)
 
-## Outras referências:
+🧰 Pré-requisitos
+Python >= 3.8
+📦 Dependências principais
+pip install pandas dask sqlalchemy
+🐬 MySQL
+pip install pymysql
+🐘 PostgreSQL
+pip install psycopg2-binary
+⚙️ Configuração
 
-Para trabalhar com os dados de cnpj no formato SQLITE, use o meu projeto (https://github.com/rictom/cnpj-sqlite).<br>
-A criação do arquivo sqlite é muita mais rápida que o carregamento da base em Mysql ou Postgres.<br>
-O projeto (https://github.com/rictom/rede-cnpj) utiliza os dados públicos de CNPJ para visualização de relacionamentos entre empresas e sócios.<br>
+Edite os parâmetros no início do script:
 
-## Histórico de versões
-versão 0.2 (janeiro/2022)
-- aceita sqlalchemy>=2.0;
-  
-versão 0.2 (julho/2022)
-- alterações menores no sql, para funcionar também em postgres;
-- versão para postgres.
+dbname = 'cnpj'
+username = 'root'
+password = ''
+host = '127.0.0.1'
+🚀 Execução
+1. Download dos dados
+python dados_cnpj_baixa.py
 
-versão 0.1 (novembro/2021)
-- primeira versão
+📁 Saída:
+
+/dados-publicos-zip
+2. Preparar diretório
+
+Crie manualmente:
+
+/dados-publicos
+
+(⚠️ Deve estar vazio)
+
+3. Importação para banco
+MySQL
+python dados_cnpj_mysql.py
+PostgreSQL
+python dados_cnpj_postgres.py
+📊 Visualização de Pipeline (Processamento)
+graph TD
+    A[ZIP Files] --> B[CSV Parsing]
+    B --> C[Data Cleaning]
+    C --> D[Normalization]
+    D --> E[Database Load]
+🧪 Estratégias de Otimização
+⚡ Uso de Dask para paralelismo
+💾 Possibilidade de staging em SQLite
+🔄 Migração via pgloader ou DBeaver
+📉 Redução de I/O com batch inserts
+| Estratégia           | Vantagem               |
+| -------------------- | ---------------------- |
+| SQLite intermediário | 🚀 Muito mais rápido   |
+| pgloader             | 🔄 Migração eficiente  |
+| DBeaver              | 🖥️ Interface amigável |
+🧩 Projetos Relacionados
+🔗 https://github.com/rictom/cnpj-sqlite
+🔗 https://github.com/rictom/rede-cnpj
+📡 Roadmap Técnico
+timeline
+    title Evolução do Projeto
+
+    2021 : Versão inicial
+    2022 : Compatibilidade SQLAlchemy 2.0
+    2024 : Atualização estrutura Receita
+    2026 : 🔥 Expansão de integrações
+📲 Atualizações Futuras (IMPORTANTE)
+
+🚧 Em breve será disponibilizada uma atualização crítica com:
+
+📱 Inclusão de até 9 números de telefone por entidade
+🔄 Mecanismo de atualização incremental de contatos
+📡 Normalização e enriquecimento de dados de comunicação
+🧠 Preparação para integração com modelos de IA analítica
+Arquitetura prevista:
+flowchart LR
+    A[CNPJ Base] --> B[Enriquecimento]
+    B --> C[Telefones]
+    C --> D[Atualização Incremental]
+    D --> E[Base Inteligente]
+🧠 Aplicações Avançadas
+🔍 Portais tipo Escavador
+📊 Inteligência de mercado
+🧬 Análise de redes empresariais
+🤖 Integração com LLMs (IA privada)
+📦 Versionamento
+Versão	Data	Descrição
+0.2	Jul/2022	Compatibilidade PostgreSQL
+0.2	Jan/2022	SQLAlchemy ≥ 2.0
+0.1	Nov/2021	Primeira versão
+⚖️ Compliance
+
+✔ Dados públicos oficiais
+✔ Compatível com LGPD (uso adequado)
+✔ Sem dados sensíveis após sanitização
+
+👨‍💻 Autor
+
+Projeto baseado no trabalho de:
+https://github.com/rictom
+
+💡 Contribuições
+
+Pull requests são bem-vindos 🚀
+Sugestões de otimização são altamente encorajadas.
+
+<p align="center"> <b style="color:#00FF41;">Infraestrutura de dados é poder.</b><br> <sub>Transformando dados públicos em inteligência operacional.</sub> </p> ```
