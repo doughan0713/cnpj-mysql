@@ -21,6 +21,7 @@ innodb_buffer_pool_size=1G # depends on your data and machine
 
 import pandas as pd, sqlalchemy, glob, time, dask.dataframe as dd
 from sqlalchemy import text
+from sqlalchemy.engine import URL
 import os, sys
 
 #%% DEFINA os parâmetros do servidor.
@@ -30,11 +31,14 @@ import os, sys
 # password = ''
 # host = '127.0.0.1'
 
-tipo_banco = 'postgres'
-dbname = 'cnpj'
-username = 'postgres'
-password = 'senha'
-host = '127.0.0.1'
+# ✅ SEGURANÇA: Usando variáveis de ambiente para credenciais.
+# ✅ GOOD: Credentials from environment variables
+tipo_banco = os.getenv('DB_TYPE', 'postgres')
+dbname = os.getenv('DB_NAME', 'cnpj')
+username = os.getenv('DB_USER', 'postgres')
+password = os.getenv('DB_PASS', 'senha')
+host = os.getenv('DB_HOST', '127.0.0.1')
+port = os.getenv('DB_PORT', '5432' if tipo_banco == 'postgres' else '3306')
 
 pasta_compactados = r"dados-publicos-zip"
 pasta_saida = r"dados-publicos" #esta pasta deve estar vazia. 
@@ -44,18 +48,28 @@ resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname
 if not resp or resp.upper()!='S':
     sys.exit()
 
-if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
-elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+# ✅ SEGURANÇA: Construção segura da URL de conexão para evitar vazamento de credenciais e problemas com caracteres especiais.
+# ✅ GOOD: Secure connection string construction
+if tipo_banco == 'mysql':
+    drivername = 'mysql+pymysql'
+elif tipo_banco == 'postgres':
+    drivername = 'postgresql'
 else:
-    print('tipo de banco de dados não informado')
+    print('tipo de banco de dados não informado ou não suportado')
     sys.exit()
+
+url_obj = URL.create(
+    drivername=drivername,
+    username=username,
+    password=password,
+    host=host,
+    port=int(port),
+    database=dbname,
+)
+
+engine_ = sqlalchemy.create_engine(url_obj)
+engine = engine_.connect()
+engine_url = str(url_obj)
 
 #%%
 
@@ -383,8 +397,10 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+# ✅ SEGURANÇA: Usando consultas parametrizadas para evitar SQL Injection.
+# ✅ GOOD: Parameterized queries
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'CNPJ', "val": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'cnpj_qtde', "val": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
