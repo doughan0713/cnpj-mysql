@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+dados-publicos/
+dados-publicos-zip/
+# .jules/ # Removido para permitir o commit do sentinel.md se necessário, mas Sentinel costuma usar .jules
