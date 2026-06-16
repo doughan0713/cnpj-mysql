@@ -24,11 +24,13 @@ from sqlalchemy import text
 import os, sys
 
 #%% DEFINA os parâmetros do servidor.
-tipo_banco= 'mysql'
-dbname = 'cnpj'
-username = 'root'
-password = ''
-host = '127.0.0.1'
+# Prioritize environment variables for security
+tipo_banco = os.environ.get('DB_TYPE', 'mysql')
+dbname = os.environ.get('DB_NAME', 'cnpj')
+username = os.environ.get('DB_USER', 'root')
+password = os.environ.get('DB_PASS', '')
+host = os.environ.get('DB_HOST', '127.0.0.1')
+port = os.environ.get('DB_PORT', '3306')
 
 # tipo_banco = 'postgres'
 # dbname = 'cnpj'
@@ -45,14 +47,29 @@ if not resp or resp.upper()!='S':
     sys.exit()
 
 if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
+    url_object = sqlalchemy.engine.URL.create(
+        "mysql+pymysql",
+        username=username,
+        password=password,
+        host=host,
+        port=int(port),
+        database=dbname,
+    )
+    engine_ = sqlalchemy.create_engine(url_object)
     engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
+    engine_url = url_object
 elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
+    url_object = sqlalchemy.engine.URL.create(
+        "postgresql",
+        username=username,
+        password=password,
+        host=host,
+        port=int(os.environ.get('DB_PORT', '5432')),
+        database=dbname,
+    )
+    engine_ = sqlalchemy.create_engine(url_object)
     engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+    engine_url = url_object
 else:
     print('tipo de banco de dados não informado')
     sys.exit()
@@ -383,8 +400,8 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'CNPJ', "val": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'cnpj_qtde', "val": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
