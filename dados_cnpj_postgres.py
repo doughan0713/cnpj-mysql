@@ -30,11 +30,13 @@ import os, sys
 # password = ''
 # host = '127.0.0.1'
 
-tipo_banco = 'postgres'
-dbname = 'cnpj'
-username = 'postgres'
-password = 'senha'
-host = '127.0.0.1'
+# As configurações do banco de dados podem ser definidas via variáveis de ambiente:
+# DB_TYPE, DB_NAME, DB_USER, DB_PASS, DB_HOST
+tipo_banco = os.getenv('DB_TYPE', 'postgres')
+dbname = os.getenv('DB_NAME', 'cnpj')
+username = os.getenv('DB_USER', 'postgres')
+password = os.getenv('DB_PASS', 'senha')
+host = os.getenv('DB_HOST', '127.0.0.1')
 
 pasta_compactados = r"dados-publicos-zip"
 pasta_saida = r"dados-publicos" #esta pasta deve estar vazia. 
@@ -44,17 +46,31 @@ resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname
 if not resp or resp.upper()!='S':
     sys.exit()
 
-if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
-elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+if tipo_banco == 'mysql':
+    driver = 'mysql+pymysql'
+    port = os.getenv('DB_PORT', '3306')
+elif tipo_banco == 'postgres':
+    driver = 'postgresql'
+    port = os.getenv('DB_PORT', '5432')
 else:
-    print('tipo de banco de dados não informado')
+    print('tipo de banco de dados não informado ou não suportado')
+    sys.exit()
+
+engine_url_obj = sqlalchemy.engine.URL.create(
+    drivername=driver,
+    username=username,
+    password=password,
+    host=host,
+    port=port,
+    database=dbname
+)
+
+try:
+    engine_ = sqlalchemy.create_engine(engine_url_obj)
+    engine = engine_.connect()
+    engine_url = engine_url_obj.render_as_string(hide_password=False)
+except Exception as e:
+    print(f'Erro ao conectar ao banco de dados: {e}')
     sys.exit()
 
 #%%
@@ -383,8 +399,9 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+# ✅ SEGURANÇA: Uso de parâmetros vinculados para evitar SQL Injection
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'CNPJ', "val": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'cnpj_qtde', "val": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
