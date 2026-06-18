@@ -5,7 +5,7 @@ Created on Sat Nov 13 18:54:00 2021
 @author: rictom
 https://github.com/rictom/cnpj-mysql
 
-#Para mysql, requer biblioteca pymysql ou mysqlclient (msqldb), desempenho semelhantes.
+#Para mysql, requer biblioteca pymysql or mysqlclient (msqldb), desempenho semelhantes.
 pip install pymysql
 pip install mysqlclient (mysqldb). O desempenho com essa biblioteca foi similar a pymysql
 
@@ -24,42 +24,51 @@ from sqlalchemy import text
 import os, sys
 
 #%% DEFINA os parâmetros do servidor.
-# tipo_banco= 'mysql'
-# dbname = 'cnpj'
-# username = 'root'
-# password = ''
-# host = '127.0.0.1'
-
-tipo_banco = 'postgres'
-dbname = 'cnpj'
-username = 'postgres'
-password = 'senha'
-host = '127.0.0.1'
+# Os parâmetros podem ser definidos via variáveis de ambiente
+tipo_banco = os.getenv('DB_TYPE', 'postgres')
+dbname = os.getenv('DB_NAME', 'cnpj')
+username = os.getenv('DB_USER', 'postgres')
+password = os.getenv('DB_PASS', 'senha')
+host = os.getenv('DB_HOST', '127.0.0.1')
+port = os.getenv('DB_PORT', '5432' if tipo_banco == 'postgres' else '3306')
 
 pasta_compactados = r"dados-publicos-zip"
-pasta_saida = r"dados-publicos" #esta pasta deve estar vazia. 
+pasta_saida = r"dados-publicos" #esta pasta deve estar vazia.
 dataReferencia = 'dd/mm/2024' #input('Data de referência da base dd/mm/aaaa: ')
 
 resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname.upper()} no servidor {tipo_banco} {host} e MODIFICAR a pasta {pasta_saida}. Deseja prosseguir? (S/N)?')
 if not resp or resp.upper()!='S':
     sys.exit()
 
-if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
-elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+if tipo_banco == 'mysql':
+    url_object = sqlalchemy.engine.URL.create(
+        drivername="mysql+pymysql",
+        username=username,
+        password=password,
+        host=host,
+        port=int(port),
+        database=dbname,
+    )
+elif tipo_banco == 'postgres':
+    url_object = sqlalchemy.engine.URL.create(
+        drivername="postgresql",
+        username=username,
+        password=password,
+        host=host,
+        port=int(port),
+        database=dbname,
+    )
 else:
-    print('tipo de banco de dados não informado')
+    print('tipo de banco de dados não informado ou não suportado')
     sys.exit()
+
+engine_ = sqlalchemy.create_engine(url_object)
+engine = engine_.connect()
+engine_url = url_object
 
 #%%
 
-#cam = os.path.join(pasta_saida, 'cnpj.db') 
+#cam = os.path.join(pasta_saida, 'cnpj.db')
 #if os.path.exists(cam):
 #    print('o arquivo ' + cam + ' já existe. Apague primeiro e rode este script novamente.')
 #    1/0
@@ -76,7 +85,7 @@ for arq in arquivos_a_zipar:
 dataReferenciaAux = list(glob.glob(os.path.join(pasta_saida, '*.EMPRECSV')))[0].split('.')[2] #formato DAMMDD, vai ser usado no final para inserir na tabela  _ref
 if len(dataReferenciaAux)==len('D30610') and dataReferenciaAux.startswith('D'):
     dataReferencia = dataReferenciaAux[4:6] + '/' + dataReferenciaAux[2:4] + '/202' + dataReferenciaAux[1]
-	
+
 #%%
 #tipos = ['.EMPRECSV', '.ESTABELE', '.SOCIOCSV']
 
@@ -221,9 +230,9 @@ carregaTabelaCodigo('.QUALSCSV', 'qualificacao_socio')
 
 #%%
 
-colunas_estabelecimento = ['cnpj_basico','cnpj_ordem', 'cnpj_dv','matriz_filial', 
+colunas_estabelecimento = ['cnpj_basico','cnpj_ordem', 'cnpj_dv','matriz_filial',
               'nome_fantasia',
-              'situacao_cadastral','data_situacao_cadastral', 
+              'situacao_cadastral','data_situacao_cadastral',
               'motivo_situacao_cadastral',
               'nome_cidade_exterior',
               'pais',
@@ -231,7 +240,7 @@ colunas_estabelecimento = ['cnpj_basico','cnpj_ordem', 'cnpj_dv','matriz_filial'
               'cnae_fiscal',
               'cnae_fiscal_secundaria',
               'tipo_logradouro',
-              'logradouro', 
+              'logradouro',
               'numero',
               'complemento','bairro',
               'cep','uf','municipio',
@@ -240,7 +249,7 @@ colunas_estabelecimento = ['cnpj_basico','cnpj_ordem', 'cnpj_dv','matriz_filial'
               'ddd_fax', 'fax',
               'correio_eletronico',
               'situacao_especial',
-              'data_situacao_especial']    
+              'data_situacao_especial']
 
 colunas_empresas = ['cnpj_basico', 'razao_social',
            'natureza_juridica',
@@ -279,12 +288,12 @@ def carregaTipo(nome_tabela, tipo, colunas):
     for arq in arquivos:
         print(f'carregando: {arq=}')
         print('lendo csv ...', time.asctime())
-        ddf = dd.read_csv(arq, sep=';', header=None, names=colunas, 
-                         encoding='latin1', dtype=str, na_filter=None) #.head(n=1000) 
+        ddf = dd.read_csv(arq, sep=';', header=None, names=colunas,
+                         encoding='latin1', dtype=str, na_filter=None) #.head(n=1000)
         #df.columns = colunas.copy()
         #engine.execute('Drop table if exists estabelecimento')
         print('to_sql...', time.asctime())
-        ddf.to_sql(nome_tabela, engine_url, index=None, if_exists='append', #parallel=True, #method='multi', chunksize=1000, 
+        ddf.to_sql(nome_tabela, engine_url, index=None, if_exists='append', #parallel=True, #method='multi', chunksize=1000,
                   dtype=sqlalchemy.sql.sqltypes.String) # .TEXT)
         print('fim parcial...', time.asctime())
 
@@ -293,12 +302,12 @@ def carregaTipo(nome_tabela, tipo, colunas):
 #     print(f'carregando: {tipo=}')
 #     print('lendo csv ...', time.asctime())
 #     #dask possibilita usar curinga no nome de arquivo
-#     ddf = dd.read_csv(pasta_saida+r'\*' + tipo, 
-#                       sep=';', header=None, names=colunas, 
+#     ddf = dd.read_csv(pasta_saida+r'\*' + tipo,
+#                       sep=';', header=None, names=colunas,
 #                       encoding='latin1', dtype=str,
 #                       na_filter=None)
 #     print('to_sql...', time.asctime())
-#     ddf.to_sql(nome_tabela, str(engine.url), index=None, if_exists='append', #method='multi', chunksize=1000, 
+#     ddf.to_sql(nome_tabela, str(engine.url), index=None, if_exists='append', #method='multi', chunksize=1000,
 #               dtype=sqlalchemy.sql.sqltypes.TEXT)
 #     print('fim parcial...', time.asctime())
 
@@ -348,7 +357,7 @@ ON socios_original(cnpj_basico);
 
 DROP TABLE IF EXISTS socios;
 
-CREATE TABLE socios AS 
+CREATE TABLE socios AS
 SELECT te.cnpj as cnpj, ts.*
 from socios_original ts
 left join estabelecimento te on te.cnpj_basico = ts.cnpj_basico
@@ -378,13 +387,13 @@ for k, sql in enumerate(sqls.split(';')):
     engine.execute(text(sql))
     print('fim parcial...', time.asctime())
 print('fim sqls...', time.asctime())
-                
+
 #%% inserir na tabela referencia_
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+engine.execute(text("insert into _referencia (referencia, valor) values ('CNPJ', :valor)"), {"valor": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values ('cnpj_qtde', :valor)"), {"valor": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
@@ -396,4 +405,3 @@ engine.commit()
 engine.close()
 
 print('FIM!!!', time.asctime())
-
