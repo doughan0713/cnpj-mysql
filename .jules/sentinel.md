@@ -1,0 +1,4 @@
+## 2025-05-24 - [Secure Database Connections and SQL Parameterization]
+**Vulnerability:** Hardcoded database credentials and SQL injection risk via f-strings in ingestion scripts.
+**Learning:** The scripts used f-strings to insert dynamic values into SQL queries executed via `engine.execute(text(...))`. While SQLAlchemy's `text()` was used, the f-string interpolation happened before SQLAlchemy could parameterize the query, leaving it vulnerable. Additionally, credentials were hardcoded, making it difficult to deploy securely.
+**Prevention:** Use environment variables for all configuration. Construct connection URLs using `sqlalchemy.engine.URL.create()` to handle special characters safely. Always use bind parameters (e.g., `:param`) in `text()` and pass a dictionary of values to `engine.execute()` to ensure proper escaping and parameterization by the database driver.
