@@ -23,12 +23,26 @@ import pandas as pd, sqlalchemy, glob, time, dask.dataframe as dd
 from sqlalchemy import text
 import os, sys
 
+def carregar_env(caminho_env='.env'):
+    """Carrega variáveis de ambiente de um arquivo .env sem dependências externas."""
+    if os.path.exists(caminho_env):
+        with open(caminho_env, 'r', encoding='utf-8') as f:
+            for linha in f:
+                linha = linha.strip()
+                if not linha or linha.startswith('#') or '=' not in linha:
+                    continue
+                chave, valor = linha.split('=', 1)
+                os.environ[chave.strip()] = valor.strip().strip('"').strip("'")
+
+carregar_env()
+
 #%% DEFINA os parâmetros do servidor.
-tipo_banco= 'mysql'
-dbname = 'cnpj'
-username = 'root'
-password = ''
-host = '127.0.0.1'
+tipo_banco = os.getenv('DB_TYPE', 'mysql')
+dbname = os.getenv('DB_NAME', 'cnpj')
+username = os.getenv('DB_USER', 'root')
+password = os.getenv('DB_PASS', '')
+host = os.getenv('DB_HOST', '127.0.0.1')
+port = os.getenv('DB_PORT', '3306' if tipo_banco == 'mysql' else '5432')
 
 # tipo_banco = 'postgres'
 # dbname = 'cnpj'
@@ -44,18 +58,30 @@ resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname
 if not resp or resp.upper()!='S':
     sys.exit()
 
-if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
-elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+if tipo_banco == 'mysql':
+    engine_url = sqlalchemy.engine.URL.create(
+        drivername="mysql+pymysql",
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=dbname,
+    )
+elif tipo_banco == 'postgres':
+    engine_url = sqlalchemy.engine.URL.create(
+        drivername="postgresql",
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=dbname,
+    )
 else:
     print('tipo de banco de dados não informado')
     sys.exit()
+
+engine_ = sqlalchemy.create_engine(engine_url)
+engine = engine_.connect()
 
 #%%
 
@@ -284,7 +310,7 @@ def carregaTipo(nome_tabela, tipo, colunas):
         #df.columns = colunas.copy()
         #engine.execute('Drop table if exists estabelecimento')
         print('to_sql...', time.asctime())
-        ddf.to_sql(nome_tabela, engine_url, index=None, if_exists='append', #parallel=True, #method='multi', chunksize=1000, 
+        ddf.to_sql(nome_tabela, engine_, index=None, if_exists='append', #parallel=True, #method='multi', chunksize=1000,
                   dtype=sqlalchemy.sql.sqltypes.String) # .TEXT)
         print('fim parcial...', time.asctime())
 
@@ -383,8 +409,9 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+# Usando parâmetros nomeados para evitar SQL injection
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'CNPJ', "val": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values (:ref, :val)"), {"ref": 'cnpj_qtde', "val": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
