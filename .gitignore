@@ -1,0 +1,5 @@
+.env
+dados-publicos/
+dados-publicos-zip/
+__pycache__/
+*.py[cod]

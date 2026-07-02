@@ -25,7 +25,7 @@ def requisitos():
         os.mkdir(pasta_cnpj)
     if not os.path.isdir(pasta_zip):
         os.mkdir(pasta_zip)
-        
+
     arquivos_existentes = list(glob.glob(pasta_cnpj +'/*.*')) + list(glob.glob(pasta_zip + '/*.*'))
     if len(arquivos_existentes):
         #eg.msgbox("Este programa baixa arquivos csv.zip de dados abertos da Receita Federal e converte para uso na RedeCNPJ aplicativo.\nIMPORTANTE: Para prosseguir, as pastas 'dados-publicos' e 'dados-publicos-zip', devem estar vazias, senão poderá haver inconsistências (juntar dados de meses distintos).\n",'Criar Bases RedeCNPJ')
@@ -60,13 +60,13 @@ except:
 
 
 url = url_dados_abertos + ultima_referencia
-# page = requests.get(url)    
+# page = requests.get(url)
 # data = page.text
 soup = BeautifulSoup(requests.get(url).text, features="lxml")
 lista = []
 print('Relação de Arquivos em ' + url)
 for link in soup.find_all('a'):
-    if str(link.get('href')).endswith('.zip'): 
+    if str(link.get('href')).endswith('.zip'):
         cam = link.get('href')
         if not cam.startswith('http'):
             print(url+cam)
@@ -75,11 +75,11 @@ for link in soup.find_all('a'):
             print(cam)
             lista.append(cam)
 
-if __name__ == '__main__':        
+if __name__ == '__main__':
     resp = input(f'Deseja baixar os arquivos acima para a pasta {pasta_zip} (y/n)?')
     if resp.lower()!='y' and resp.lower()!='s':
         sys.exit()
-        
+
 
 
 print(time.asctime(), 'Início do Download dos arquivos...')
@@ -103,12 +103,12 @@ else: #baixar sequencial, rotina antiga
         # Don't use print() as it will print in new line every time.
         sys.stdout.write("\r" + progress_message)
         sys.stdout.flush()
-      
+
     for k, url in enumerate(lista):
         print('\n' + time.asctime() + f' - item {k}: ' + url)
         wget.download(url, out=os.path.join(pasta_zip, os.path.split(url)[1]), bar=bar_progress)
 
-        
+
 print('\n\n'+ time.asctime(), f' Finalizou {sys.argv[0]}!!!')
 print(f"Baixou {len(glob.glob(os.path.join(pasta_zip,'*.zip')))} arquivos.")
 if __name__ == '__main__':
