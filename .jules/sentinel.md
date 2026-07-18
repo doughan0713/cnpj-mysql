@@ -1,0 +1,4 @@
+## 2026-06-15 - SQL Injection in Metadata Insertion
+**Vulnerability:** The database ingestion scripts used f-string interpolation when inserting metadata values (such as `dataReferencia` and `qtde_cnpjs`) into the `_referencia` table, creating SQL injection vulnerabilities if any values contained malicious characters.
+**Learning:** Raw string manipulation and f-string interpolation within SQL executions ignore parameterization safeguards and can easily expose the database to unauthorized actions. Even apparently simple configuration values or data-derived numbers must be treated with zero trust.
+**Prevention:** Always use parameterized queries with SQLAlchemy's `text()` function and explicit bind parameter dictionaries (e.g. `engine.execute(text("... :param ..."), {"param": value})`) for inserting values into tables.
