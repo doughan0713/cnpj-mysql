@@ -383,8 +383,16 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+# ✅ SECURE: Use parameterized queries to prevent SQL injection during metadata insertion.
+# Using SQLAlchemy text() with bind parameters instead of Python f-string interpolation.
+engine.execute(
+    text("insert into _referencia (referencia, valor) values (:ref_name, :ref_val)"),
+    {"ref_name": "CNPJ", "ref_val": str(dataReferencia)}
+)
+engine.execute(
+    text("insert into _referencia (referencia, valor) values (:ref_name, :ref_val)"),
+    {"ref_name": "cnpj_qtde", "ref_val": str(qtde_cnpjs)}
+)
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
