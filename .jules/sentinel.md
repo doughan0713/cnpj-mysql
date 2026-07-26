@@ -1,0 +1,4 @@
+## 2026-06-15 - Metadata SQL Injection in CNPJ Ingestion Scripts
+**Vulnerability:** SQL Injection in the metadata tables insertion logic where data reference (`dataReferencia`) and CNPJ count (`qtde_cnpjs`) were interpolated using Python f-strings inside SQLAlchemy `text()` execution calls (`engine.execute(text(f"insert into _referencia ..."))`).
+**Learning:** Inserting values via string interpolation directly into dynamic SQL queries generated inside database loaders bypassed any auto-parameterization, opening a window for SQL injection. Additionally, files had CRLF (`\r\n`) line endings, which required binary/byte-level substitution to avoid large diff warnings during PR reviews.
+**Prevention:** Always use SQLAlchemy's bind parameters (`:param_name`) with a second argument dictionary in `engine.execute(text(...), {"param_name": value})` instead of Python f-strings or string concatenation.
