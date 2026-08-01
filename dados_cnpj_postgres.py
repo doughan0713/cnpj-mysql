@@ -21,20 +21,46 @@ innodb_buffer_pool_size=1G # depends on your data and machine
 
 import pandas as pd, sqlalchemy, glob, time, dask.dataframe as dd
 from sqlalchemy import text
+from sqlalchemy.engine import URL
 import os, sys
 
-#%% DEFINA os parâmetros do servidor.
-# tipo_banco= 'mysql'
-# dbname = 'cnpj'
-# username = 'root'
-# password = ''
-# host = '127.0.0.1'
+def carregar_env(caminho=".env"):
+    """Loads environment variables from a .env file securely without external dependencies."""
+    if not os.path.exists(caminho):
+        return
+    with open(caminho, "r", encoding="utf-8") as f:
+        for linha in f:
+            linha = linha.strip()
+            # Ignore empty lines and full comment lines
+            if not linha or linha.startswith("#"):
+                continue
+            if "=" in linha:
+                partes = linha.split("=", 1)
+                chave = partes[0].strip()
+                valor = partes[1].strip()
+                # Remove quotes if present, but do NOT strip inline comments to prevent truncating passwords
+                if (valor.startswith('"') and valor.endswith('"')) or (valor.startswith("'") and valor.endswith("'")):
+                    valor = valor[1:-1]
+                os.environ[chave] = valor
 
-tipo_banco = 'postgres'
-dbname = 'cnpj'
-username = 'postgres'
-password = 'senha'
-host = '127.0.0.1'
+# Load configuration from .env file securely
+carregar_env()
+
+#%% DEFINA os parâmetros do servidor usando variáveis de ambiente de forma segura.
+# Default passwords are set to empty strings in os.getenv calls to avoid hardcoding insecure placeholder values.
+tipo_banco = os.getenv('DB_TYPE', 'postgres')
+dbname = os.getenv('DB_NAME', 'cnpj')
+username = os.getenv('DB_USER', 'postgres')
+password = os.getenv('DB_PASS', '')
+host = os.getenv('DB_HOST', '127.0.0.1')
+port_env = os.getenv('DB_PORT', '').strip()
+
+# Database port conversion uses str.isdigit() validation before calling int() to prevent runtime errors.
+# Defaults to 3306 for MySQL and 5432 for PostgreSQL if empty or invalid.
+if not port_env or not port_env.isdigit():
+    port = 3306 if tipo_banco == 'mysql' else 5432
+else:
+    port = int(port_env)
 
 pasta_compactados = r"dados-publicos-zip"
 pasta_saida = r"dados-publicos" #esta pasta deve estar vazia. 
@@ -44,18 +70,33 @@ resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname
 if not resp or resp.upper()!='S':
     sys.exit()
 
-if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
-elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+# Connection URLs are constructed using sqlalchemy.engine.URL.create to securely handle special characters in credentials
+if tipo_banco == 'mysql':
+    url_objeto = URL.create(
+        drivername="mysql+pymysql",
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=dbname
+    )
+elif tipo_banco == 'postgres':
+    url_objeto = URL.create(
+        drivername="postgresql",
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=dbname
+    )
 else:
     print('tipo de banco de dados não informado')
     sys.exit()
+
+engine_ = sqlalchemy.create_engine(url_objeto)
+engine = engine_.connect()
+# Render the URL as a string to avoid serialization/pickle issues with parallel Dask workers
+engine_url = url_objeto.render_as_string(hide_password=False)
 
 #%%
 
@@ -383,8 +424,9 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+# Secured against SQL injection by utilizing parameterized queries with SQLAlchemy text() and bind parameters
+engine.execute(text("insert into _referencia (referencia, valor) values ('CNPJ', :dataReferencia)"), {"dataReferencia": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values ('cnpj_qtde', :qtde_cnpjs)"), {"qtde_cnpjs": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
