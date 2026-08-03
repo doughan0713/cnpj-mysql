@@ -1,0 +1,4 @@
+## 2026-08-03 - Prevent SQL Injection in Metadata Reference Table Ingestion
+**Vulnerability:** String formatting (f-strings) was used to interpolate variable values (`dataReferencia` and `qtde_cnpjs`) directly into dynamic SQL insert statements targeting the `_referencia` metadata table. This exposes the database pipeline to SQL injection if any of the ingested files or metadata are manipulated or untrusted.
+**Learning:** Legacy insertion code bypassed standard parameterized constructs for quick, secondary tasks like updating run metadata or logging counts. SQL injection risks apply to metadata schemas, status trackers, and auxiliary logging tables just as much as main user tables.
+**Prevention:** Always use parameterized queries (via SQLAlchemy `text()` and bind parameters passed as a dictionary) even for simple metadata operations or local ingestion logs.
