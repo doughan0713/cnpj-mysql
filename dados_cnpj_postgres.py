@@ -23,39 +23,78 @@ import pandas as pd, sqlalchemy, glob, time, dask.dataframe as dd
 from sqlalchemy import text
 import os, sys
 
-#%% DEFINA os parâmetros do servidor.
-# tipo_banco= 'mysql'
-# dbname = 'cnpj'
-# username = 'root'
-# password = ''
-# host = '127.0.0.1'
+def carregar_env():
+    """
+    Carrega variáveis do arquivo .env no diretório raiz sem dependências externas.
+    Trata espaços, remove aspas e ignora comentários em linha para segurança.
+    """
+    if os.path.exists('.env'):
+        with open('.env', 'r', encoding='utf-8') as f:
+            for linha in f:
+                linha = linha.strip()
+                if not linha or linha.startswith('#'):
+                    continue
+                # Divide pela primeira ocorrência de '='
+                partes = linha.split('=', 1)
+                if len(partes) == 2:
+                    chave = partes[0].strip()
+                    valor = partes[1].strip()
+                    # Remove aspas externas se houver
+                    if (valor.startswith('"') and valor.endswith('"')) or (valor.startswith("'") and valor.endswith("'")):
+                        valor = valor[1:-1]
+                    os.environ[chave] = valor
 
-tipo_banco = 'postgres'
-dbname = 'cnpj'
-username = 'postgres'
-password = 'senha'
-host = '127.0.0.1'
+# Carrega de forma segura as variáveis de ambiente
+carregar_env()
+
+#%% DEFINA os parâmetros do servidor usando variáveis de ambiente ou fallbacks seguros.
+tipo_banco = os.getenv('DB_TYPE', 'postgres')
+dbname = os.getenv('DB_NAME', 'cnpj')
+username = os.getenv('DB_USER', 'postgres')
+password = os.getenv('DB_PASS', '')
+host = os.getenv('DB_HOST', '127.0.0.1')
+port_raw = os.getenv('DB_PORT', '5432')
+
+# Valida a porta antes da conversão para int
+port = int(port_raw) if port_raw.isdigit() else 5432
 
 pasta_compactados = r"dados-publicos-zip"
 pasta_saida = r"dados-publicos" #esta pasta deve estar vazia. 
 dataReferencia = 'dd/mm/2024' #input('Data de referência da base dd/mm/aaaa: ')
 
-resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname.upper()} no servidor {tipo_banco} {host} e MODIFICAR a pasta {pasta_saida}. Deseja prosseguir? (S/N)?')
+# Mascara a senha no prompt de confirmação para evitar exposição nos logs do console
+senha_mascarada = '***' if password else ''
+resp = input(f'Isto irá CRIAR TABELAS ou REESCREVER TABELAS no database {dbname.upper()} no servidor {tipo_banco} {host}:{port} (Usuário: {username}, Senha: {senha_mascarada}) e MODIFICAR a pasta {pasta_saida}. Deseja prosseguir? (S/N)?')
 if not resp or resp.upper()!='S':
     sys.exit()
 
-if tipo_banco=='mysql':
-    #engine = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine_ = sqlalchemy.create_engine(f'mysql+pymysql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'mysql+pymysql://{username}:{password}@{host}/{dbname}'
-elif tipo_banco=='postgres':
-    engine_ = sqlalchemy.create_engine(f'postgresql://{username}:{password}@{host}/{dbname}')
-    engine = engine_.connect()
-    engine_url = f'postgresql://{username}:{password}@{host}/{dbname}'
+# Constrói a URL de forma segura usando sqlalchemy.engine.URL.create para sanitizar credenciais especiais e evitar SQLi
+if tipo_banco == 'mysql':
+    url_objeto = sqlalchemy.engine.URL.create(
+        drivername="mysql+pymysql",
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=dbname
+    )
+elif tipo_banco == 'postgres':
+    url_objeto = sqlalchemy.engine.URL.create(
+        drivername="postgresql",
+        username=username,
+        password=password,
+        host=host,
+        port=port,
+        database=dbname
+    )
 else:
-    print('tipo de banco de dados não informado')
+    print('tipo de banco de dados não informado ou não suportado')
     sys.exit()
+
+# Renderiza a URL com a senha visível internamente para autenticação no banco
+engine_url = url_objeto.render_as_string(hide_password=False)
+engine_ = sqlalchemy.create_engine(engine_url)
+engine = engine_.connect()
 
 #%%
 
@@ -383,8 +422,9 @@ print('fim sqls...', time.asctime())
 
 qtde_cnpjs = engine.execute(text('select count(*) as contagem from estabelecimento;')).fetchone()[0]
 
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')"))
-engine.execute(text(f"insert into _referencia (referencia, valor) values ('cnpj_qtde', '{qtde_cnpjs}')"))
+# Evita f-string SQLi parametrizando a consulta com bind parameters do SQLAlchemy
+engine.execute(text("insert into _referencia (referencia, valor) values ('CNPJ', :dataReferencia)"), {"dataReferencia": dataReferencia})
+engine.execute(text("insert into _referencia (referencia, valor) values ('cnpj_qtde', :qtde_cnpjs)"), {"qtde_cnpjs": str(qtde_cnpjs)})
 
 print('-'*20)
 print(f'As tabelas foram criadas no servidor {tipo_banco}.')
