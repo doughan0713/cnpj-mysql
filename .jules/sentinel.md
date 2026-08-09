@@ -1,0 +1,4 @@
+## 2026-06-25 - Secure Ingestion SQL Parameterization and URL Parsing
+**Vulnerability:** SQL Injection in metadata tables like `_referencia` using f-string interpolation for `dataReferencia` and `qtde_cnpjs`.
+**Learning:** Hardcoded configuration variables or dynamically read inputs from scraped filenames can still be manipulated, resulting in SQL injection. Constructing database URLs using f-strings also poses SQL/URL injection risks. Dask requires string representations of database connections (`render_as_string`) to avoid serialization issues across parallel workers.
+**Prevention:** Utilize SQLAlchemy's parameterized queries with `text()` and bind parameter dictionaries. Generate connection URLs securely using `sqlalchemy.engine.URL.create` and pass the rendered string version to Dask's `to_sql`.
