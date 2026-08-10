@@ -1,0 +1,4 @@
+## 2026-06-25 - SQL Injection in _referencia Ingestion Table
+**Vulnerability:** The data ingestion scripts (`dados_cnpj_mysql.py` and `dados_cnpj_postgres.py`) populated metadata table `_referencia` using Python f-string interpolation directly inside SQLAlchemy `text()` wrappers. Variables `dataReferencia` and `qtde_cnpjs` were dynamically embedded inside the SQL command, posing SQL injection risks.
+**Learning:** Even if the database insertion only occurs for metadata/administrative purposes, interpolating non-static variables directly inside SQL statements or using `text(f"...")` creates an avenue for SQL injection. High quality security standards require paramterization for any variable database input.
+**Prevention:** Always use parameterized query parameters/bindings (e.g., using `text("INSERT INTO ... VALUES (:key, :val)")` and passing a parameter dict to execution methods) when passing variables to any SQL query, including administrative metadata queries.
