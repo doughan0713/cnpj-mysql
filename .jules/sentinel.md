@@ -1,0 +1,4 @@
+## 2026-06-25 - SQL Injection in Metadata Insertion Table
+**Vulnerability:** In both `dados_cnpj_mysql.py` and `dados_cnpj_postgres.py`, SQL insertions into the `_referencia` metadata table were constructed using f-string string interpolation (e.g., `text(f"insert into _referencia (referencia, valor) values ('CNPJ', '{dataReferencia}')")`). If `dataReferencia` or `qtde_cnpjs` was derived from untrusted filenames/inputs or user-controlled environment/input parameters, this could lead to SQL injection attacks.
+**Learning:** String interpolation or f-strings should never be used to parameterize values in SQL queries even if they appear safe or internal. This is a common pattern in older/legacy scripts migrating between database clients.
+**Prevention:** Always use parameterized SQL statements utilizing SQLAlchemy's `text()` along with bind parameter dictionaries to securely handle variables in SQL queries.
