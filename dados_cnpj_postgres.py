@@ -33,7 +33,8 @@ import os, sys
 tipo_banco = 'postgres'
 dbname = 'cnpj'
 username = 'postgres'
-password = 'senha'
+# Security: avoid hardcoding default passwords in code
+password = os.getenv('DB_PASS', '')
 host = '127.0.0.1'
 
 pasta_compactados = r"dados-publicos-zip"

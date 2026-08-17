@@ -33,7 +33,7 @@ host = '127.0.0.1'
 # tipo_banco = 'postgres'
 # dbname = 'cnpj'
 # username = 'postgres'
-# password = 'senha'
+# password = ''
 # host = '127.0.0.1'
 
 pasta_compactados = r"dados-publicos-zip"
